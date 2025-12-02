@@ -1,0 +1,19 @@
+name: GISEle_V1.1
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.10
+  - numpy
+  - pandas
+  - geopandas
+  - rasterio
+  - scipy
+  - scikit-learn
+  - shapely
+  - gdal
+  - fiona
+  - pyproj
+  - rtree
+  - jupyter
+  - ipykernel
