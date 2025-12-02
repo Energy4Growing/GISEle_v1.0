@@ -15,79 +15,10 @@ from osgeo import gdal
 
 import rasterio
 from rasterio.mask import mask
-def poles_clustering_and_cleaning(buildings_filter, crs, chain_upper_bound,pole_upper_bound):
-    def create_clusters(buildings_filter,max_distance):
-        coordinates = [(point.x, point.y) for point in buildings_filter.geometry]
-        kdtree = cKDTree(coordinates)
-        assigned = np.zeros(len(buildings_filter.geometry), dtype=bool) 
-        #Here it creates a boolean fixed to false 
-        clusters = []
-        def dfs(node, current_cluster):
-            # Depth-first search to find connected points within the given distance
-            neighbors = kdtree.query_ball_point(coordinates[node], chain_upper_bound)
-            unassigned_neighbors = [neighbor for neighbor in neighbors if not assigned[neighbor]]
-
-            # Mark neighbors as assigned
-            assigned[unassigned_neighbors] = True
-
-            # Add the current point to the current cluster if it hasn't been added already
-            if node not in current_cluster:
-                current_cluster.append(node)
-
-            # Recursively process unassigned neighbors
-            for neighbor in unassigned_neighbors:
-                dfs(neighbor, current_cluster)
-
-        # Iterate through points to form clusters
-        for i, shapely_point in enumerate(buildings_filter.geometry):
-            if not assigned[i]:
-                current_cluster = []
-                dfs(i, current_cluster)
-                clusters.append(current_cluster)
-        return clusters
-    result_clusters = create_clusters(buildings_filter,chain_upper_bound) 
-    i=0
-    for clus in result_clusters:
-        if len(clus)>2: # if there are more thn 2 big macro areas
-            coords = [(point.x, point.y) for point in buildings_filter.loc[clus,'geometry']]
-            distances = squareform(pdist(coords))
-            agg_cluster = AgglomerativeClustering(distance_threshold=pole_upper_bound,n_clusters=None,  linkage='complete')
-            cluster_labels = agg_cluster.fit_predict(distances)
-            if len(set(cluster_labels))>1: #if agglomerative clustering find more than 1 subgroups
-                for j in list(set(cluster_labels)):
-                    indices = [index for index, value in enumerate(cluster_labels) if value == j]
-                    buildings_filter.loc[[clus[k] for k in indices],'Group2']=i
-                    i+=1
-                 
-            else:
-                buildings_filter.loc[clus,'Group2']=i
-        else:
-            buildings_filter.loc[clus,'Group2']=i
-        i+=1 
-
-    collapse_results = [item for sublist in result_clusters for item in sublist]
-    for i in range(len(result_clusters)):
-        buildings_filter.loc[result_clusters[i],'Group']=i
-    buildings_adjusted = []
-    area=[]
-    num=[] 
-    elec_access = []  
-    
-    cons = [] 
-    # pdb.set_trace()
-    for group in buildings_filter['Group2'].unique():
-        buildings_adjusted.append(MultiPoint(buildings_filter.loc[buildings_filter['Group2']==group,'geometry'].values).centroid)
-        area.append(buildings_filter.loc[buildings_filter['Group2']==group,'area'].sum()) 
-        cons.append(buildings_filter.loc[buildings_filter['Group2']==group,'cons (kWh/'].sum())
-        num.append(len(buildings_filter.loc[buildings_filter['Group2']==group,'area'])) 
-        elec_access.append(buildings_filter.loc[buildings_filter['Group2']==group,'elec acces'].mean())
-    
-    buildings_adjusted_gdf = gpd.GeoDataFrame({'area':area,'number':num, 'cons (kWh/':cons, 'elec acces':elec_access},geometry=buildings_adjusted,crs=crs)
-    
-    return buildings_adjusted_gdf
 
 
-def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, area_lower_bound, max_distance_pole, pole_distance, radius, dens_filter):   
+
+def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, area_lower_bound, radius, dens_filter,threshold):   
     gisele_folder=os.getcwd()
     database =os.path.join(gisele_folder,'Database')
     study_area_buffered=study_area_gpd
@@ -106,10 +37,10 @@ def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, ar
         buildings_df = buildings_df.reset_index(drop=True)  
         
         
-        buildings_df = buildings_df[buildings_df['area']>area_lower_bound]
+        buildings_df = buildings_df[buildings_df['area'] > area_lower_bound]
         buildings_df['ID']=[*range(len(buildings_df))]
         buildings_df.reset_index(inplace=True,drop=True)
-        buildings_df_up = poles_clustering_and_cleaning(buildings_df, crs, max_distance_pole, pole_distance)
+        buildings_df_up = buildings_df
         
         urbanity_raster = os.path.join(database, country, 'Urbanity', 'Urbanity.tif')
         output_modified_raster = os.path.join(database,country, "Urbanity", "Urbanity_clip_rep_convolve.tif")
@@ -159,10 +90,6 @@ def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, ar
         Urbanity_final = rasterio.open(output_modified_raster) 
         coords = [(point.x, point.y) for point in buildings_df_up['geometry']]
         buildings_df_up['urbanity'] = [x[0] for x in Urbanity_final.sample(coords)] 
-        
-
-        
-    
     else: 
         print('Skipped')
         #TODO Completare qui 
@@ -189,7 +116,7 @@ def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, ar
     
     clusters_gdf = gpd.GeoDataFrame(geometry=clusters, crs=crs) 
     clusters_gdf = clusters_gdf.reset_index().rename(columns={'index': 'cluster_ID'})
-    clusters_gdf['cluster_ID'] = clusters_gdf['cluster_ID']+1 
+    clusters_gdf['cluster_ID'] = clusters_gdf['cluster_ID'] + 1 
     spatial_join = gpd.sjoin(buildings_df_up, clusters_gdf, how='left', predicate='within') 
     
     try: 
@@ -206,7 +133,7 @@ def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, ar
      
     average_elec_access = buildings_df_up.groupby('cluster_ID')['elec acces'].mean()   
     #I do here a average electrification access and then for each clustrer I do a random selection of the electrification according to that percentage
-    threshold = 0.3
+    
   
     if len(clusters_gdf) > 0:
         clusters_gdf = clusters_gdf.merge(average_elec_access, left_on='cluster_ID', right_index=True, how='left')  
