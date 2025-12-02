@@ -18,7 +18,7 @@ from rasterio.mask import mask
 
 
 
-def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, area_lower_bound, max_distance_pole, pole_distance, radius, dens_filter):   
+def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, area_lower_bound, radius, dens_filter,threshold):   
     gisele_folder=os.getcwd()
     database =os.path.join(gisele_folder,'Database')
     study_area_buffered=study_area_gpd
@@ -37,10 +37,10 @@ def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, ar
         buildings_df = buildings_df.reset_index(drop=True)  
         
         
-        buildings_df = buildings_df[buildings_df['area']>area_lower_bound]
+        buildings_df = buildings_df[buildings_df['area'] > area_lower_bound]
         buildings_df['ID']=[*range(len(buildings_df))]
         buildings_df.reset_index(inplace=True,drop=True)
-        buildings_df_up = poles_clustering_and_cleaning(buildings_df, crs, max_distance_pole, pole_distance)
+        buildings_df_up = buildings_df
         
         urbanity_raster = os.path.join(database, country, 'Urbanity', 'Urbanity.tif')
         output_modified_raster = os.path.join(database,country, "Urbanity", "Urbanity_clip_rep_convolve.tif")
@@ -90,10 +90,6 @@ def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, ar
         Urbanity_final = rasterio.open(output_modified_raster) 
         coords = [(point.x, point.y) for point in buildings_df_up['geometry']]
         buildings_df_up['urbanity'] = [x[0] for x in Urbanity_final.sample(coords)] 
-        
-
-        
-    
     else: 
         print('Skipped')
         #TODO Completare qui 
@@ -120,7 +116,7 @@ def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, ar
     
     clusters_gdf = gpd.GeoDataFrame(geometry=clusters, crs=crs) 
     clusters_gdf = clusters_gdf.reset_index().rename(columns={'index': 'cluster_ID'})
-    clusters_gdf['cluster_ID'] = clusters_gdf['cluster_ID']+1 
+    clusters_gdf['cluster_ID'] = clusters_gdf['cluster_ID'] + 1 
     spatial_join = gpd.sjoin(buildings_df_up, clusters_gdf, how='left', predicate='within') 
     
     try: 
@@ -137,7 +133,7 @@ def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, ar
      
     average_elec_access = buildings_df_up.groupby('cluster_ID')['elec acces'].mean()   
     #I do here a average electrification access and then for each clustrer I do a random selection of the electrification according to that percentage
-    threshold = 0.3
+    
   
     if len(clusters_gdf) > 0:
         clusters_gdf = clusters_gdf.merge(average_elec_access, left_on='cluster_ID', right_index=True, how='left')  
