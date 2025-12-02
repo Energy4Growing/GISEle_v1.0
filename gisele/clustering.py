@@ -15,76 +15,7 @@ from osgeo import gdal
 
 import rasterio
 from rasterio.mask import mask
-def poles_clustering_and_cleaning(buildings_filter, crs, chain_upper_bound,pole_upper_bound):
-    def create_clusters(buildings_filter,max_distance):
-        coordinates = [(point.x, point.y) for point in buildings_filter.geometry]
-        kdtree = cKDTree(coordinates)
-        assigned = np.zeros(len(buildings_filter.geometry), dtype=bool) 
-        #Here it creates a boolean fixed to false 
-        clusters = []
-        def dfs(node, current_cluster):
-            # Depth-first search to find connected points within the given distance
-            neighbors = kdtree.query_ball_point(coordinates[node], chain_upper_bound)
-            unassigned_neighbors = [neighbor for neighbor in neighbors if not assigned[neighbor]]
 
-            # Mark neighbors as assigned
-            assigned[unassigned_neighbors] = True
-
-            # Add the current point to the current cluster if it hasn't been added already
-            if node not in current_cluster:
-                current_cluster.append(node)
-
-            # Recursively process unassigned neighbors
-            for neighbor in unassigned_neighbors:
-                dfs(neighbor, current_cluster)
-
-        # Iterate through points to form clusters
-        for i, shapely_point in enumerate(buildings_filter.geometry):
-            if not assigned[i]:
-                current_cluster = []
-                dfs(i, current_cluster)
-                clusters.append(current_cluster)
-        return clusters
-    result_clusters = create_clusters(buildings_filter,chain_upper_bound) 
-    i=0
-    for clus in result_clusters:
-        if len(clus)>2: # if there are more thn 2 big macro areas
-            coords = [(point.x, point.y) for point in buildings_filter.loc[clus,'geometry']]
-            distances = squareform(pdist(coords))
-            agg_cluster = AgglomerativeClustering(distance_threshold=pole_upper_bound,n_clusters=None,  linkage='complete')
-            cluster_labels = agg_cluster.fit_predict(distances)
-            if len(set(cluster_labels))>1: #if agglomerative clustering find more than 1 subgroups
-                for j in list(set(cluster_labels)):
-                    indices = [index for index, value in enumerate(cluster_labels) if value == j]
-                    buildings_filter.loc[[clus[k] for k in indices],'Group2']=i
-                    i+=1
-                 
-            else:
-                buildings_filter.loc[clus,'Group2']=i
-        else:
-            buildings_filter.loc[clus,'Group2']=i
-        i+=1 
-
-    collapse_results = [item for sublist in result_clusters for item in sublist]
-    for i in range(len(result_clusters)):
-        buildings_filter.loc[result_clusters[i],'Group']=i
-    buildings_adjusted = []
-    area=[]
-    num=[] 
-    elec_access = []  
-    
-    cons = [] 
-    # pdb.set_trace()
-    for group in buildings_filter['Group2'].unique():
-        buildings_adjusted.append(MultiPoint(buildings_filter.loc[buildings_filter['Group2']==group,'geometry'].values).centroid)
-        area.append(buildings_filter.loc[buildings_filter['Group2']==group,'area'].sum()) 
-        cons.append(buildings_filter.loc[buildings_filter['Group2']==group,'cons (kWh/'].sum())
-        num.append(len(buildings_filter.loc[buildings_filter['Group2']==group,'area'])) 
-        elec_access.append(buildings_filter.loc[buildings_filter['Group2']==group,'elec acces'].mean())
-    
-    buildings_adjusted_gdf = gpd.GeoDataFrame({'area':area,'number':num, 'cons (kWh/':cons, 'elec acces':elec_access},geometry=buildings_adjusted,crs=crs)
-    
-    return buildings_adjusted_gdf
 
 
 def building_to_cluster_v1(crs,case_study, study_area_gpd, country, urbanity, area_lower_bound, max_distance_pole, pole_distance, radius, dens_filter):   
