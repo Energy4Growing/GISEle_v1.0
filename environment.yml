@@ -1,5 +1,6 @@
 name: GISEle_V1.1
 channels:
+  - gurobi
   - conda-forge
 
 dependencies:
@@ -17,3 +18,5 @@ dependencies:
   - rtree
   - jupyter
   - ipykernel
+  - pyomo
+  - gurobi
