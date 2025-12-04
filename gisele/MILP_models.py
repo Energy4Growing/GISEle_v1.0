@@ -1576,14 +1576,16 @@ def MILP_MG_noRel(gisele_folder,case_study,n_clusters,coe,voltage,line1):
     #         k=k+1
     # Voltage_drop.to_csv('MILP_results/solution_new/Voltage_drops.csv',index=False)
 
-import pdb
-def MILP_base(gisele_folder,case_study,n_clusters,coe,voltage,line1):
+
+def MILP_base(case_study,n_clusters,coe,voltage,line1):
     ############ Create abstract model ###########
     model = AbstractModel()
     data = DataPortal()
-    MILP_input_folder = gisele_folder + '/Case studies/' + case_study + '/Intermediate/Optimization/MILP_input'
-    MILP_output_folder = gisele_folder + '/Case studies/' + case_study + '/Intermediate/Optimization/MILP_output'
-    os.chdir(MILP_input_folder)
+    gisele_folder=os.getcwd() 
+
+    MILP_input_folder = os.path.join(gisele_folder,'Case studies',case_study,'Intermediate','Optimization','MILP_input')
+    MILP_output_folder = os.path.join(gisele_folder,'Case studies',case_study,'Intermediate','Optimization','MILP_output')
+
 
     # Define some basic parameter for the per unit conversion and voltage limitation
     Abase = 1
@@ -1591,25 +1593,25 @@ def MILP_base(gisele_folder,case_study,n_clusters,coe,voltage,line1):
     voltage_constraint = True
     ####################Define sets#####################
     model.N = Set()
-    data.load(filename='nodes.csv', set=model.N)  # first row is not read
+    data.load(filename=os.path.join(MILP_input_folder,'nodes.csv'), set=model.N)  # first row is not read
     model.N_clusters = Set()
-    data.load(filename='nodes_clusters.csv', set=model.N_clusters)
+    data.load(filename=os.path.join(MILP_input_folder,'nodes_clusters.csv'), set=model.N_clusters)
     model.N_PS = Set()
-    data.load(filename='nodes_PS.csv', set=model.N_PS)
+    data.load(filename=os.path.join(MILP_input_folder,'nodes_PS.csv'), set=model.N_PS)
     # Node corresponding to primary substation
 
     # Allowed connections
     model.links = Set(dimen=2)  # in the csv the values must be delimited by commas
-    data.load(filename='links_all.csv', set=model.links)
+    data.load(filename=os.path.join(MILP_input_folder,'links_all.csv'), set=model.links)
 
     model.links_clusters = Set(dimen=2)
-    data.load(filename='links_clusters.csv', set=model.links_clusters)
+    data.load(filename=os.path.join(MILP_input_folder,'links_clusters.csv'), set=model.links_clusters)
 
     model.links_decision = Set(dimen=2)
-    data.load(filename='links_decision.csv', set=model.links_decision)
+    data.load(filename=os.path.join(MILP_input_folder,'links_decision.csv'), set=model.links_decision)
     # Connection distance of all the edges
     model.dist = Param(model.links)
-    data.load(filename='distances.csv', param=model.dist)
+    data.load(filename=os.path.join(MILP_input_folder,'distances.csv'), param=model.dist)
     # Nodes are divided into two sets, as suggested in https://pyomo.readthedocs.io/en/stable/pyomo_modeling_components/Sets.html:
     # NodesOut[nodes] gives for each node all nodes that are connected to it via outgoing links
     # NodesIn[nodes] gives for each node all nodes that are connected to it via ingoing links
@@ -1636,20 +1638,19 @@ def MILP_base(gisele_folder,case_study,n_clusters,coe,voltage,line1):
 
     # Electric power in the nodes (injected (-) or absorbed (+))
     model.Psub = Param(model.N_clusters)
-    data.load(filename='power_nodes.csv', param=model.Psub)
+    data.load(filename=os.path.join(MILP_input_folder,'power_nodes.csv'), param=model.Psub)
 
     model.ps_cost = Param(model.N_PS)
-    data.load(filename='PS_costs.csv', param=model.ps_cost)
+    data.load(filename=os.path.join(MILP_input_folder,'PS_costs.csv'), param=model.ps_cost)
 
     model.PSmax = Param(model.N_PS)
-    data.load(filename='PS_power_max.csv', param=model.PSmax)
+    data.load(filename=os.path.join(MILP_input_folder,'PS_power_max.csv'), param=model.PSmax)
 
     model.PS_voltage = Param(model.N_PS)
-    data.load(filename='PS_voltage.csv', param=model.PS_voltage)
-
+    data.load(filename=os.path.join(MILP_input_folder,'PS_voltage.csv'), param=model.PS_voltage)
 
     model.weights = Param(model.links_decision)
-    data.load(filename='weights_decision_lines.csv', param=model.weights)
+    data.load(filename=os.path.join(MILP_input_folder,'weights_decision_lines.csv'), param=model.weights)
     # Electrical parameters of all the cables
     model.V_ref = Param(initialize=voltage)
     model.A_ref = Param(initialize=Abase)
