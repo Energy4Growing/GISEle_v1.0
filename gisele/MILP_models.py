@@ -2924,7 +2924,7 @@ def MILP_2cables(gisele_folder,case_study,n_clusters,coe,voltage,line1,line2):
     Voltages.to_csv(MILP_output_folder + '/Voltages.csv', index=False)
     all_lines.to_csv(MILP_output_folder + '/all_lines.csv', index=False)
     instance.GetTuneResult()
-def MILP_3cables(gisele_folder,case_study,n_clusters,coe,voltage,line1,line2,line3):
+
 
     voltage_constraint = True
     ############ Create abstract model ###########
