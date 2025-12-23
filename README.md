@@ -3,7 +3,7 @@ GIS for Electrification
 
 GISELE Optimization Model
 
-Flow Conservation
+Power Flow Conservation
 
 For each cluster \(n\):
 
