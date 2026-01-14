@@ -8,7 +8,7 @@ dependencies:
   - numpy=2.4.1
   - pandas=2.3.3
   - geopandas=1.1.2
-  - rasterio=1.14.4
+  - rasterio=1.4.4
   - scipy=1.17.0
   - scikit-learn=1.8.0
   - shapely=2.1.2
